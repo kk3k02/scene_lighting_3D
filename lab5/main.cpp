@@ -1,27 +1,29 @@
-/*************************************************************************************/
-
-//  Szkielet programu do tworzenia modelu sceny 3-D z wizualizacj¹ osi 
-//  uk³adu wspó³rzêdnych dla rzutowania perspektywicznego
-
-/*************************************************************************************/
-
-#include <windows.h>
+ï»¿#include <windows.h>
 #include <gl/gl.h>
 #include <gl/glut.h>
+#include <math.h>
 #include <iostream>
+#include <cstdlib>
+#include <ctime>
 
 using namespace std;
+
+int model = 1; // Wybor rysowanego obiektu: 1 - czajnik, 2 - jajko
+
+const double pi = 3.14159265358979323846;
+
+int N = 30; // Liczba przedzialow boku kwadratu
 
 typedef float point3[3];
 
 static GLfloat viewer[] = { 0.0, 0.0, 10.0 };
-// inicjalizacja po³o¿enia obserwatora
+// inicjalizacja poÅ‚oÅ¼enia obserwatora
 
 static GLfloat theta = 0.0;
-// k¹t obrotu obiektu wokó³ osi x
+// kÄ…t obrotu obiektu wokÃ³Å‚ osi x
 
 static GLfloat gamma = 0.0;
-// k¹t obrotu obiektu wokó³ osi y
+// kÄ…t obrotu obiektu wokÃ³Å‚ osi y
 
 static GLfloat pix2angle;
 static GLfloat piy2angle;
@@ -30,20 +32,20 @@ static GLfloat piy2angle;
 static GLint status_left = 0;
 static GLint status_right = 0;
 // stan klawiszy myszy
-// 0 - nie naciœniêto ¿adnego klawisza
-// 1 - naciœniêty zostaæ lewy klawisz
+// 0 - nie naciÅ›niÄ™to Å¼adnego klawisza
+// 1 - naciÅ›niÄ™ty zostaÄ‡ lewy klawisz
 
 static int delta_x = 0;
-// ró¿nica pomiêdzy pozycj¹ bie¿¹c¹
-// i poprzedni¹ kursora myszy (x)
+// rÃ³Å¼nica pomiÄ™dzy pozycjÄ… bieÅ¼Ä…cÄ…
+// i poprzedniÄ… kursora myszy (x)
 
 static int delta_y = 0;
-// ró¿nica pomiêdzy pozycj¹ bie¿¹c¹
-// i poprzedni¹ kursora myszy (y)
+// rÃ³Å¼nica pomiÄ™dzy pozycjÄ… bieÅ¼Ä…cÄ…
+// i poprzedniÄ… kursora myszy (y)
 
 static int delta_zoom = 0;
-// ró¿nica pomiêdzy pozycj¹ bie¿¹c¹
-// i poprzedni¹ zoom
+// rÃ³Å¼nica pomiÄ™dzy pozycjÄ… bieÅ¼Ä…cÄ…
+// i poprzedniÄ… zoom
 
 static int x_pos_old = 0;
 // poprzednia pozycja kursora myszy (x)
@@ -57,7 +59,166 @@ static int zoom_pos_old = 0;
 
 /*************************************************************************************/
 
-// Funkcja rysuj¹ca osie uk³adu wspó?rz?dnych
+// Funkcja obliczajaca wspolrzedne powierzchni opisanej rownaniami parametrycznymi
+
+float calculate(string xyz, float u, float v)
+{
+
+    if (u >= 0 && u <= 1 && v >= 0 && v <= 1)
+    {
+        float result = 0.0;
+
+        // x(u, v)
+        if (xyz == "x")
+        {
+            result = (-90.0 * powf(u, 5) + 225.0 * powf(u, 4) - 270.0 * powf(u, 3) + 180.0 * powf(u, 2) - 45.0 * u) * cos(float(pi) * v);
+        }
+        // y(u, v)
+        else if (xyz == "y")
+        {
+            result = (160.0 * powf(u, 4) - 320.0 * powf(u, 3) + 160 * powf(u, 2));
+        }
+        // z(u, v)
+        else if (xyz == "z")
+        {
+            result = (-90.0 * powf(u, 5) + 225.0 * powf(u, 4) - 270.0 * powf(u, 3) + 180.0 * powf(u, 2) - 45.0 * u) * sin(float(pi) * v);
+        }
+        else if (xyz == "ux")
+        {
+            result = (-450.0 * powf(u, 4) + 900.0 * powf(u, 3) - 810.0 * powf(u, 2) + 360.0 * u - 45.0) * cos(float(pi) * v);
+        }
+        else if (xyz == "vx")
+        {
+            result = float(pi) * (90.0 * powf(u, 5) - 225.0 * powf(u, 4) + 270.0 * powf(u, 3) - 180.0 * powf(u, 2) + 45.0) * sin(float(pi) * v);
+        }
+        else if (xyz == "uy")
+        {
+            result = (640.0 * powf(u, 3) - 960.0 * powf(u, 2) + 320.0 * u);
+        }
+        else if (xyz == "vy")
+        {
+            result = 0.0;
+        }
+        else if (xyz == "uz")
+        {
+            result = (-450.0 * powf(u, 4) + 900.0 * powf(u, 3) - 810.0 * powf(u, 2) + 360.0 * u - 45.0) * sin(float(pi) * v);
+        }
+        else if (xyz == "vz")
+        {
+            result = -float(pi) * (90.0 * powf(u, 5) - 225.0 * powf(u, 4) + 270.0 * powf(u, 3) - 180.0 * powf(u, 2) + 45.0) * cos(float(pi) * v);
+        }
+
+        return result;
+    }
+
+    return NULL;
+}
+
+/*************************************************************************************/
+
+// Funkcja obliczajaca wartosci wektora normalnego
+float calculate_vector(char xyz, float u, float v)
+{
+    float normal = 0.0;
+
+    if (xyz == 'x' || xyz == 'y' || xyz == 'z')
+    {
+        if (xyz == 'x')
+        {
+            normal = (calculate("uy", u, v) * calculate("vz", u, v)) - (calculate("uz", u, v) * calculate("vy", u, v));
+            normal = normal / calculate("x", u, v);
+        }
+        if (xyz == 'y')
+        {
+            normal = (calculate("uz", u, v) * calculate("vx", u, v)) - (calculate("ux", u, v) * calculate("vz", u, v));
+            normal = normal / calculate("y", u, v);
+        }
+        if (xyz == 'z')
+        {
+            normal = (calculate("ux", u, v) * calculate("vy", u, v)) - (calculate("uy", u, v) * calculate("vx", u, v));
+            normal = normal / calculate("z", u, v);
+        }
+
+        return normal;
+    }
+    
+    return NULL;
+}
+
+/*************************************************************************************/
+
+// Funkcja rysujaca obiekt w postaci wypelnionych trojkatow
+
+void egg(void)
+{
+    // Inicjalizacja generatora liczb pseudolosowych
+    srand(static_cast<unsigned int>(time(nullptr)));
+
+    glBegin(GL_TRIANGLES);
+
+    // Rysowanie trï¿½jkï¿½tï¿½w jajka
+    for (int i = 0; i < N - 1; i++)
+    {
+        for (int j = 0; j < N - 1; j++)
+        {
+            float u0 = (1.0 / (N - 1)) * i;
+            float v0 = (1.0 / (N - 1)) * j;
+
+            float u1 = (1.0 / (N - 1)) * (i + 1);
+            float v1 = (1.0 / (N - 1)) * j;
+
+            float u2 = (1.0 / (N - 1)) * i;
+            float v2 = (1.0 / (N - 1)) * (j + 1);
+
+            float u3 = (1.0 / (N - 1)) * (i + 1);
+            float v3 = (1.0 / (N - 1)) * (j + 1);
+
+            float x = 0.0;
+            float y = 0.0;
+            float z = 0.0;
+       
+            // Pierwszy trojkat
+            x = calculate_vector('x', u0, v0);
+            y = calculate_vector('y', u0, v0);
+            z = calculate_vector('z', u0, v0);
+            glNormal3f(x, y, z);
+            glVertex3f(calculate("x", u0, v0), calculate("y", u0, v0), calculate("z", u0, v0));
+            x = calculate_vector('x', u1, v1);
+            y = calculate_vector('y', u1, v1);
+            z = calculate_vector('z', u1, v1);
+            glNormal3f(x, y, z);
+            glVertex3f(calculate("x", u1, v1), calculate("y", u1, v1), calculate("z", u1, v1));
+            x = calculate_vector('x', u2, v2);
+            y = calculate_vector('y', u2, v2);
+            z = calculate_vector('z', u2, v2);
+            glNormal3f(x, y, z);
+            glVertex3f(calculate("x", u2, v2), calculate("y", u2, v2), calculate("z", u2, v2));
+
+            // Drugi trojkat
+            x = calculate_vector('x', u1, v1);
+            y = calculate_vector('y', u1, v1);
+            z = calculate_vector('z', u1, v1);
+            glNormal3f(x, y, z);
+            glVertex3f(calculate("x", u1, v1), calculate("y", u1, v1), calculate("z", u1, v1));
+            x = calculate_vector('x', u3, v3);
+            y = calculate_vector('y', u3, v3);
+            z = calculate_vector('z', u3, v3);
+            glNormal3f(x, y, z);
+            glVertex3f(calculate("x", u3, v3), calculate("y", u3, v3), calculate("z", u3, v3));
+            x = calculate_vector('x', u2, v2);
+            y = calculate_vector('y', u2, v2);
+            z = calculate_vector('z', u2, v2);
+            glNormal3f(x, y, z);
+            glVertex3f(calculate("x", u2, v2), calculate("y", u2, v2), calculate("z", u2, v2));
+        }
+    }
+
+    glEnd();
+}
+
+/*************************************************************************************/
+
+// Funkcja rysujÄ…ca osie ukÅ‚adu wspÃ³?rz?dnych
 void Axes(void)
 {
 
@@ -95,7 +256,7 @@ void Axes(void)
 }
 
 /*************************************************************************************/
-// Funkcja "bada" stan myszy i ustawia wartoœci odpowiednich zmiennych globalnych
+// Funkcja "bada" stan myszy i ustawia wartoÅ›ci odpowiednich zmiennych globalnych
 
 void Mouse(int btn, int state, int x, int y)
 {
@@ -108,7 +269,7 @@ void Mouse(int btn, int state, int x, int y)
         // przypisanie aktualnie odczytanej pozycji kursora
         // jako pozycji poprzedniej
         status_left = 1;
-        // wciêniêty zosta³ lewy klawisz myszy
+        // wciÄ™niÄ™ty zostaÅ‚ lewy klawisz myszy
     }
     else if (btn == GLUT_RIGHT_BUTTON && state == GLUT_DOWN && btn != GLUT_LEFT_BUTTON)
     {
@@ -116,18 +277,18 @@ void Mouse(int btn, int state, int x, int y)
         // przypisanie aktualnie odczytanej pozycji kursora
         // jako pozycji poprzedniej
         status_right = 1;
-        // wciêniêty zosta³ prawy klawisz myszy
+        // wciÄ™niÄ™ty zostaÅ‚ prawy klawisz myszy
     }
     else
     {
         status_left = 0;
         status_right = 0;
     }
-    // nie zosta³ wciêniêty ¿aden klawisz
+    // nie zostaÅ‚ wciÄ™niÄ™ty Å¼aden klawisz
 }
 
 /*************************************************************************************/
-// Funkcja "monitoruje" po³o¿enie kursora myszy i ustawia wartoœci odpowiednich
+// Funkcja "monitoruje" poÅ‚oÅ¼enie kursora myszy i ustawia wartoÅ›ci odpowiednich
 // zmiennych globalnych
 
 void Motion(GLsizei x, GLsizei y)
@@ -136,68 +297,85 @@ void Motion(GLsizei x, GLsizei y)
     delta_x = x - x_pos_old;
     delta_y = y - y_pos_old;
     delta_zoom = x - x_pos_old;
-    // obliczenie ró¿nicy po³o¿enia kursora myszy
+    // obliczenie rÃ³Å¼nicy poÅ‚oÅ¼enia kursora myszy
 
     x_pos_old = x;
     y_pos_old = y;
     zoom_pos_old = x;
-    // podstawienie bie¿¹cego po³o¿enia jako poprzednie
+    // podstawienie bieÅ¼Ä…cego poÅ‚oÅ¼enia jako poprzednie
 
     glutPostRedisplay();     // przerysowanie obrazu sceny
 }
 
 /*************************************************************************************/
 
-/*************************************************************************************/
-
-// Funkcja okreœlaj¹ca co ma byæ rysowane (zawsze wywo³ywana, gdy trzeba
-// przerysowaæ scenê)
-
-
-
+// Funkcja okreÅ›lajÄ…ca co ma byÄ‡ rysowane (zawsze wywoÅ‚ywana, gdy trzeba
+// przerysowaÄ‡ scenÄ™)
 void RenderScene(void)
 {
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    // Czyszczenie okna aktualnym kolorem czyszcz¹cym
+    // Czyszczenie okna aktualnym kolorem czyszczÄ…cym
 
     glLoadIdentity();
     // Czyszczenie macierzy bie??cej
 
     gluLookAt(viewer[0], viewer[1], viewer[2], 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
-    // Zdefiniowanie po³o¿enia obserwatora
+    // Zdefiniowanie poÅ‚oÅ¼enia obserwatora
     Axes();
-    // Narysowanie osi przy pomocy funkcji zdefiniowanej powy¿ej
+    // Narysowanie osi przy pomocy funkcji zdefiniowanej powyÅ¼ej
 
-    if (status_left == 1 && status_right == 0)                     // jeœli lewy klawisz myszy wciêniêty
+    if (status_left == 1 && status_right == 0)                     // jeÅ›li lewy klawisz myszy wciÄ™niÄ™ty
     {
         theta += delta_x * pix2angle;
         gamma += delta_y * piy2angle;
-        // modyfikacja k¹ta obrotu o kat proporcjonalny
-        // do ró¿nicy po³o¿eñ kursora myszy
+        // modyfikacja kÄ…ta obrotu o kat proporcjonalny
+        // do rÃ³Å¼nicy poÅ‚oÅ¼eÅ„ kursora myszy
     }
-    if (status_right == 1 && status_left == 0)                     // jeœli prawy klawisz myszy wciêniêty
+    if (status_right == 1 && status_left == 0)                     // jeÅ›li prawy klawisz myszy wciÄ™niÄ™ty
     {
         viewer[2] += delta_zoom * pix2angle;
     }
 
     glColor3f(1.0f, 1.0f, 1.0f);
-    // Ustawienie koloru rysowania na bia³y
+    // Ustawienie koloru rysowania na biaÅ‚y
 
-    glRotatef(theta, 0.0, 1.0, 0.0);  //obrót obiektu o nowy k¹t (x)
-    glRotatef(gamma, 1.0, 0.0, 0.0);  //obrót obiektu o nowy k¹t (y)
+    glRotatef(theta, 0.0, 1.0, 0.0);  //obrÃ³t obiektu o nowy kÄ…t (x)
+    glRotatef(gamma, 1.0, 0.0, 0.0);  //obrÃ³t obiektu o nowy kÄ…t (y)
 
-    glutSolidTeapot(3.0);
-    // Narysowanie czajnika
+    if(model == 1)
+    {
+        glutSolidTeapot(3.0);
+        // Narysowanie czajnika
+    }
+    if(model == 2)
+    {
+        glTranslatef(0.0f, -4.0f, 0.0f);
+        // Przesuniecie obiektu wzgledem osi Y 
+        egg();
+        // Narysowanie jajka
+    }
 
     glFlush();
-    // Przekazanie poleceñ rysuj¹cych do wykonania
+    // Przekazanie poleceÅ„ rysujÄ…cych do wykonania
 
     glutSwapBuffers();
 }
 /*************************************************************************************/
 
-// Funkcja ustalaj¹ca stan renderowania
+// Funkcja obslugujaca klawisze klawiatury
+void keys(unsigned char key, int x, int y)
+{
+    if (key == 'q') model = 1;
+    if (key == 'w') model = 2;
+    if (key == 'e') model = 3;
+
+    RenderScene(); // przerysowanie obrazu sceny
+}
+
+/*************************************************************************************/
+
+// Funkcja ustalajÄ…ca stan renderowania
 
 
 
@@ -205,70 +383,71 @@ void MyInit(void)
 {
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-    // Kolor czyszcz¹cy (wype³nienia okna) ustawiono na czarny
+    // Kolor czyszczÄ…cy (wypeÅ‚nienia okna) ustawiono na czarny
 
 
     /*************************************************************************************/
 
-//  Definicja materia³u z jakiego zrobiony jest czajnik
-//  i definicja Ÿród³a œwiat³a
+//  Definicja materiaÅ‚u z jakiego zrobiony jest czajnik
+//  i definicja ÅºrÃ³dÅ‚a Å›wiatÅ‚a
 
 /*************************************************************************************/
 
 
 /*************************************************************************************/
-// Definicja materia³u z jakiego zrobiony jest czajnik
+// Definicja materiaÅ‚u z jakiego zrobiony jest czajnik
 
     GLfloat mat_ambient[] = { 1.0, 1.0, 1.0, 1.0 };
-    // wspó³czynniki ka =[kar,kag,kab] dla œwiat³a otoczenia
+    // wspÃ³Å‚czynniki ka =[kar,kag,kab] dla Å›wiatÅ‚a otoczenia
 
     GLfloat mat_diffuse[] = { 1.0, 1.0, 1.0, 1.0 };
-    // wspó³czynniki kd =[kdr,kdg,kdb] œwiat³a rozproszonego
+    // wspÃ³Å‚czynniki kd =[kdr,kdg,kdb] Å›wiatÅ‚a rozproszonego
 
     GLfloat mat_specular[] = { 1.0, 1.0, 1.0, 1.0 };
-    // wspó³czynniki ks =[ksr,ksg,ksb] dla œwiat³a odbitego               
+    // wspÃ³Å‚czynniki ks =[ksr,ksg,ksb] dla Å›wiatÅ‚a odbitego               
 
     GLfloat mat_shininess = { 20.0 };
-    // wspó³czynnik n opisuj¹cy po³ysk powierzchni
+    // wspÃ³Å‚czynnik n opisujÄ…cy poÅ‚ysk powierzchni
 
 
 /*************************************************************************************/
-// Definicja Ÿród³a œwiat³a
+// Definicja ÅºrÃ³dÅ‚a Å›wiatÅ‚a
 
+    // Definicja ÅºrÃ³dÅ‚a Å›wiatÅ‚a (kolor Å¼Ã³Å‚ty)
 
     GLfloat light_position[] = { 0.0, 0.0, 10.0, 1.0 };
-    // po³o¿enie Ÿród³a
+    // poÅ‚oÅ¼enie ÅºrÃ³dÅ‚a
 
 
-    GLfloat light_ambient[] = { 0.1, 0.1, 0.1, 1.0 };
-    // sk³adowe intensywnoœci œwiecenia Ÿród³a œwiat³a otoczenia
+    GLfloat light_ambient[] = { 0.2, 0.2, 0.0, 1.0 };
+    // skÅ‚adowe intensywnoÅ›ci Å›wiecenia ÅºrÃ³dÅ‚a Å›wiatÅ‚a otoczenia
     // Ia = [Iar,Iag,Iab]
 
-    GLfloat light_diffuse[] = { 1.0, 1.0, 1.0, 1.0 };
-    // sk³adowe intensywnoœci œwiecenia Ÿród³a œwiat³a powoduj¹cego
+    GLfloat light_diffuse[] = { 1.0, 1.0, 0.0, 1.0 };
+    // skÅ‚adowe intensywnoÅ›ci Å›wiecenia ÅºrÃ³dÅ‚a Å›wiatÅ‚a powodujÄ…cego
     // odbicie dyfuzyjne Id = [Idr,Idg,Idb]
 
-    GLfloat light_specular[] = { 1.0, 1.0, 1.0, 1.0 };
-    // sk³adowe intensywnoœci œwiecenia Ÿród³a œwiat³a powoduj¹cego
+    GLfloat light_specular[] = { 1.0, 1.0, 0.0, 1.0 };
+    // skÅ‚adowe intensywnoÅ›ci Å›wiecenia ÅºrÃ³dÅ‚a Å›wiatÅ‚a powodujÄ…cego
     // odbicie kierunkowe Is = [Isr,Isg,Isb]
 
     GLfloat att_constant = { 1.0 };
-    // sk³adowa sta³a ds dla modelu zmian oœwietlenia w funkcji
-    // odleg³oœci od Ÿród³a
+    // skÅ‚adowa staÅ‚a ds dla modelu zmian oÅ›wietlenia w funkcji
+    // odlegÅ‚oÅ›ci od ÅºrÃ³dÅ‚a
 
     GLfloat att_linear = { 0.05 };
-    // sk³adowa liniowa dl dla modelu zmian oœwietlenia w funkcji
-    // odleg³oœci od Ÿród³a
+    // skÅ‚adowa liniowa dl dla modelu zmian oÅ›wietlenia w funkcji
+    // odlegÅ‚oÅ›ci od ÅºrÃ³dÅ‚a
 
     GLfloat att_quadratic = { 0.001 };
-    // sk³adowa kwadratowa dq dla modelu zmian oœwietlenia w funkcji
-    // odleg³oœci od Ÿród³a
+    // skÅ‚adowa kwadratowa dq dla modelu zmian oÅ›wietlenia w funkcji
+    // odlegÅ‚oÅ›ci od ÅºrÃ³dÅ‚a
 
 /*************************************************************************************/
-// Ustawienie parametrów materia³u i Ÿród³a œwiat³a
+// Ustawienie parametrÃ³w materiaÅ‚u i ÅºrÃ³dÅ‚a Å›wiatÅ‚a
 
 /*************************************************************************************/
-// Ustawienie patrametrów materia³u
+// Ustawienie patrametrÃ³w materiaÅ‚u
 
 
     glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
@@ -278,7 +457,7 @@ void MyInit(void)
 
 
     /*************************************************************************************/
-    // Ustawienie parametrów Ÿród³a
+    // Ustawienie parametrÃ³w ÅºrÃ³dÅ‚a
 
     glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
     glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
@@ -291,12 +470,12 @@ void MyInit(void)
 
 
     /*************************************************************************************/
-    // Ustawienie opcji systemu oœwietlania sceny
+    // Ustawienie opcji systemu oÅ›wietlania sceny
 
-    glShadeModel(GL_SMOOTH); // w³aczenie ³agodnego cieniowania
-    glEnable(GL_LIGHTING);   // w³aczenie systemu oœwietlenia sceny
-    glEnable(GL_LIGHT0);     // w³¹czenie Ÿród³a o numerze 0
-    glEnable(GL_DEPTH_TEST); // w³¹czenie mechanizmu z-bufora
+    glShadeModel(GL_SMOOTH); // wÅ‚aczenie Å‚agodnego cieniowania
+    glEnable(GL_LIGHTING);   // wÅ‚aczenie systemu oÅ›wietlenia sceny
+    glEnable(GL_LIGHT0);     // wÅ‚Ä…czenie ÅºrÃ³dÅ‚a o numerze 0
+    glEnable(GL_DEPTH_TEST); // wÅ‚Ä…czenie mechanizmu z-bufora
 
     /*************************************************************************************/
 }
@@ -304,10 +483,10 @@ void MyInit(void)
 /*************************************************************************************/
 
 
-// Funkcja ma za zadanie utrzymanie sta³ych proporcji rysowanych
-// w przypadku zmiany rozmiarów okna.
-// Parametry vertical i horizontal (wysokoœæ i szerokoœæ okna) s¹ 
-// przekazywane do funkcji za ka¿dym razem gdy zmieni siê rozmiar okna.
+// Funkcja ma za zadanie utrzymanie staÅ‚ych proporcji rysowanych
+// w przypadku zmiany rozmiarÃ³w okna.
+// Parametry vertical i horizontal (wysokoÅ›Ä‡ i szerokoÅ›Ä‡ okna) sÄ… 
+// przekazywane do funkcji za kaÅ¼dym razem gdy zmieni siÄ™ rozmiar okna.
 
 
 
@@ -317,13 +496,13 @@ void ChangeSize(GLsizei horizontal, GLsizei vertical)
     piy2angle = 360.0 / (float)vertical; // przeliczenie pikseli na stopnie (y)
 
     glMatrixMode(GL_PROJECTION);
-    // Prze³¹czenie macierzy bie¿¹cej na macierz projekcji
+    // PrzeÅ‚Ä…czenie macierzy bieÅ¼Ä…cej na macierz projekcji
 
     glLoadIdentity();
-    // Czyszcznie macierzy bie¿¹cej
+    // Czyszcznie macierzy bieÅ¼Ä…cej
 
     gluPerspective(70, 1.0, 1.0, 30.0);
-    // Ustawienie parametrów dla rzutu perspektywicznego
+    // Ustawienie parametrÃ³w dla rzutu perspektywicznego
 
 
     if (horizontal <= vertical)
@@ -331,20 +510,20 @@ void ChangeSize(GLsizei horizontal, GLsizei vertical)
 
     else
         glViewport((horizontal - vertical) / 2, 0, vertical, vertical);
-    // Ustawienie wielkoœci okna okna widoku (viewport) w zale¿noœci
-    // relacji pomiêdzy wysokoœci¹ i szerokoœci¹ okna
+    // Ustawienie wielkoÅ›ci okna okna widoku (viewport) w zaleÅ¼noÅ›ci
+    // relacji pomiÄ™dzy wysokoÅ›ciÄ… i szerokoÅ›ciÄ… okna
 
     glMatrixMode(GL_MODELVIEW);
-    // Prze³¹czenie macierzy bie¿¹cej na macierz widoku modelu  
+    // PrzeÅ‚Ä…czenie macierzy bieÅ¼Ä…cej na macierz widoku modelu  
 
     glLoadIdentity();
-    // Czyszczenie macierzy bie¿¹cej
+    // Czyszczenie macierzy bieÅ¼Ä…cej
 
 }
 
 /*************************************************************************************/
 
-// G³ówny punkt wejœcia programu. Program dzia³a w trybie konsoli
+// GÅ‚Ã³wny punkt wejÅ›cia programu. Program dziaÅ‚a w trybie konsoli
 
 
 
@@ -356,27 +535,36 @@ void main(int argc, char** argv)
 
     glutInitWindowSize(300, 300);
 
-    glutCreateWindow("Rzutowanie perspektywiczne");
+    glutCreateWindow("OÅ›wietlenie");
+
+    cout << "Model 1 (Czajnik): q" << endl;
+    cout << "Model 2 (Jajko): w" << endl;
+    cout << "Model 3 (...): ..." << endl;
+
+    glutKeyboardFunc(keys);
+    // Wlaczenie obslugi zdarzen klawiatury
 
     glutDisplayFunc(RenderScene);
-    // Okreœlenie, ¿e funkcja RenderScene bêdzie funkcj¹ zwrotn¹
-    // (callback function).  Bêdzie ona wywo³ywana za ka¿dym razem
+    // OkreÅ›lenie, Å¼e funkcja RenderScene bÄ™dzie funkcjÄ… zwrotnÄ…
+    // (callback function).  BÄ™dzie ona wywoÅ‚ywana za kaÅ¼dym razem
     // gdy zajdzie potrzeba przerysowania okna
 
 
     glutReshapeFunc(ChangeSize);
-    // Dla aktualnego okna ustala funkcjê zwrotn¹ odpowiedzialn¹
+    // Dla aktualnego okna ustala funkcjÄ™ zwrotnÄ… odpowiedzialnÄ…
     // za zmiany rozmiaru okna                       
 
 
     glutMouseFunc(Mouse);
-    // Ustala funkcjê zwrotn¹ odpowiedzialn¹ za badanie stanu myszy
+    // Ustala funkcjÄ™ zwrotnÄ… odpowiedzialnÄ… za badanie stanu myszy
 
     glutMotionFunc(Motion);
-    // Ustala funkcjê zwrotn¹ odpowiedzialn¹ za badanie ruchu myszy
+    // Ustala funkcjÄ™ zwrotnÄ… odpowiedzialnÄ… za badanie ruchu myszy
+
+    MyInit();
 
     glEnable(GL_DEPTH_TEST);
-    // W³¹czenie mechanizmu usuwania niewidocznych elementów sceny
+    // WÅ‚Ä…czenie mechanizmu usuwania niewidocznych elementÃ³w sceny
 
     glutMainLoop();
     // Funkcja uruchamia szkielet biblioteki GLUT
