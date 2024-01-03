@@ -28,22 +28,25 @@ int N = 30; // Liczba przedzialow boku kwadratu
 
 typedef float point3[3];
 
+static float r = 0.0;
+// Inicjalizacja promienia
+
 static float azimuth0 = 0.0;
 // Inicjalizacja azymutu dla 1 zrodla swiatla
 
 static GLfloat elevation0 = 0.0;
 // Inicjalizacja elewacji dla 1 zrodla swiatla
 
-static float azimuth1 = -5.0;
+static float azimuth1 = 0.0;
 // Inicjalizacja azymutu dla 2 zrodla swiatla
 
 static GLfloat elevation1 = 0.0;
 // Inicjalizacja elewacji dla 2 zrodla swiatla
 
-GLfloat light_position0[] = { azimuth0, elevation0, 10.0, 1.0 };
+GLfloat light_position0[] = { 18.2414, 5.26967, 41.8681, 1.0 };
 // Polozenie 1 zrodla swiatla
 
-GLfloat light_position1[] = { azimuth1, elevation1, 10.0, 1.0 };
+GLfloat light_position1[] = { -19.1901, 5.26967, 42.693, 1.0 };
 // Polozenie 2 zrodla swiatla
 
 static GLfloat viewer[] = { 0.0, 0.0, 10.0 };
@@ -154,13 +157,13 @@ float calculate_angles(char xyz, float azimuth, float elevation)
         float result = 0.0;
 
         if (xyz == 'x') {
-            result = delta_zoom * cos(azimuth) * cos(elevation);
+            result = r * cos(azimuth) * cos(elevation);
         }
         if (xyz == 'y') {
-            result = delta_zoom * sin(elevation);
+            result = r * sin(elevation);
         }
         if (xyz == 'z') {
-            result = delta_zoom * sin(azimuth) * cos(elevation);
+            result = r * sin(azimuth) * cos(elevation);
         }
 
         return result;
@@ -217,7 +220,7 @@ void egg_2(void)
 
     glBegin(GL_TRIANGLES);
 
-    // Rysowanie tr�jk�t�w jajka
+    // Rysowanie trojkatw jajka
     for (int i = 0; i < N - 1; i++)
     {
         for (int j = 0; j < N - 1; j++)
@@ -373,6 +376,7 @@ void Motion(GLsizei x, GLsizei y)
     delta_x = x - x_pos_old;
     delta_y = y - y_pos_old;
     delta_zoom = y - zoom_pos_old;
+    r = delta_zoom;
 
     x_pos_old = x;
     y_pos_old = y;
@@ -432,20 +436,16 @@ void RenderScene(void)
         if (status_left == 1 && status_right == 0)
         {
             azimuth0 = delta_x * pix2angle * 0.1;
-            azimuth0 = delta_y  * piy2angle * 0.1;
+            elevation0 = delta_y  * piy2angle * 0.1;
 
             light_position0[0] += calculate_angles('x', azimuth0, elevation0);
             light_position0[1] += calculate_angles('y', azimuth0, elevation0);
             light_position0[2] += calculate_angles('z', azimuth0, elevation0);
-
-            cout << light_position0[0] << endl;
-            cout << light_position0[1] << endl;
-            cout << light_position0[2] << endl << endl;
         }
         if (status_left == 0 && status_right == 1)
         {
             azimuth1 = delta_x * pix2angle * 0.1;
-            azimuth1 = delta_y * piy2angle * 0.1;
+            elevation1 = delta_y * piy2angle * 0.1;
 
             light_position1[0] += calculate_angles('x', azimuth1, elevation1);
             light_position1[1] += calculate_angles('y', azimuth1, elevation1);
@@ -539,7 +539,7 @@ void MyInit(void)
     GLfloat att_quadratic0 = 0.001;
 
 
-    // Ustawienie parametrów źródła światła 1
+    // Ustawienie parametrów źródła światła 1 (kolor niebieski)
     glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient0);
     glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse0);
     glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular0);
@@ -556,7 +556,6 @@ void MyInit(void)
     GLfloat att_constant1 = 1.0;
     GLfloat att_linear1 = 0.05;
     GLfloat att_quadratic1 = 0.001;
-
 
     // Ustawienie parametrów źródła światła 2
     glLightfv(GL_LIGHT1, GL_AMBIENT, light_ambient1);
