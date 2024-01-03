@@ -1,4 +1,4 @@
-﻿#include <windows.h>
+#include <windows.h>
 #include <gl/gl.h>
 #include <gl/glut.h>
 #include <math.h>
@@ -8,13 +8,43 @@
 
 using namespace std;
 
-int model = 1; // Wybor rysowanego obiektu: 1 - czajnik, 2 - jajko
+int model = 1;
+// Wybor rysowanego obiektu: 1 - czajnik (wire), 2 - czajnik (solid)
+// 3 - jajko (siatka), 4 - jajko (trojkaty)
+
+int perspective = 1;
+// Perspektywa obserwatora
+// 1 - obrot obiektu
+// 2 - zmiana polozenia obserwatora
+
+int mode = 1;
+// Wybor trybu dzialania programu
+// 1 - obracanie obiektem / ruch obserwatora
+// 2 - sterowanie oswietleniem
 
 const double pi = 3.14159265358979323846;
 
 int N = 30; // Liczba przedzialow boku kwadratu
 
 typedef float point3[3];
+
+static float azimuth0 = 0.0;
+// Inicjalizacja azymutu dla 1 zrodla swiatla
+
+static GLfloat elevation0 = 0.0;
+// Inicjalizacja elewacji dla 1 zrodla swiatla
+
+static float azimuth1 = -5.0;
+// Inicjalizacja azymutu dla 2 zrodla swiatla
+
+static GLfloat elevation1 = 0.0;
+// Inicjalizacja elewacji dla 2 zrodla swiatla
+
+GLfloat light_position0[] = { azimuth0, elevation0, 10.0, 1.0 };
+// Polozenie 1 zrodla swiatla
+
+GLfloat light_position1[] = { azimuth1, elevation1, 10.0, 1.0 };
+// Polozenie 2 zrodla swiatla
 
 static GLfloat viewer[] = { 0.0, 0.0, 10.0 };
 // inicjalizacja położenia obserwatora
@@ -116,6 +146,31 @@ float calculate(string xyz, float u, float v)
 
 /*************************************************************************************/
 
+// Funkcja obliczajaca wartosci katow na podstawie azymutu i elewacji
+float calculate_angles(char xyz, float azimuth, float elevation)
+{
+    if (azimuth >= 0 && azimuth <= (2 * pi) && elevation >= 0 && elevation <= (2 * pi))
+    {
+        float result = 0.0;
+
+        if (xyz == 'x') {
+            result = delta_zoom * cos(azimuth) * cos(elevation);
+        }
+        if (xyz == 'y') {
+            result = delta_zoom * sin(elevation);
+        }
+        if (xyz == 'z') {
+            result = delta_zoom * sin(azimuth) * cos(elevation);
+        }
+
+        return result;
+    }
+
+    return 0.0;
+}
+
+/*************************************************************************************/
+
 // Funkcja obliczajaca wartosci wektora normalnego
 float calculate_vector(char xyz, float u, float v)
 {
@@ -126,30 +181,36 @@ float calculate_vector(char xyz, float u, float v)
         if (xyz == 'x')
         {
             normal = (calculate("uy", u, v) * calculate("vz", u, v)) - (calculate("uz", u, v) * calculate("vy", u, v));
-            normal = normal / calculate("x", u, v);
         }
         if (xyz == 'y')
         {
             normal = (calculate("uz", u, v) * calculate("vx", u, v)) - (calculate("ux", u, v) * calculate("vz", u, v));
-            normal = normal / calculate("y", u, v);
         }
         if (xyz == 'z')
         {
             normal = (calculate("ux", u, v) * calculate("vy", u, v)) - (calculate("uy", u, v) * calculate("vx", u, v));
-            normal = normal / calculate("z", u, v);
         }
 
         return normal;
     }
-    
+
     return NULL;
+}
+
+/*************************************************************************************/
+
+// Funkcja normalizujaca dlugosci wektorow normalnych
+
+float normalize_vector(float x, float y, float z) 
+{
+    return sqrt(powf(x, 2) + powf(y, 2) + powf(z, 2));
 }
 
 /*************************************************************************************/
 
 // Funkcja rysujaca obiekt w postaci wypelnionych trojkatow
 
-void egg(void)
+void egg_2(void)
 {
     // Inicjalizacja generatora liczb pseudolosowych
     srand(static_cast<unsigned int>(time(nullptr)));
@@ -176,21 +237,34 @@ void egg(void)
             float x = 0.0;
             float y = 0.0;
             float z = 0.0;
-       
+            float normalized = 0.0;
+
             // Pierwszy trojkat
             x = calculate_vector('x', u0, v0);
             y = calculate_vector('y', u0, v0);
             z = calculate_vector('z', u0, v0);
+            normalized = normalize_vector(x, y, z);
+            x = x / normalized;
+            y = y / normalized;
+            z = z / normalized;
             glNormal3f(x, y, z);
             glVertex3f(calculate("x", u0, v0), calculate("y", u0, v0), calculate("z", u0, v0));
             x = calculate_vector('x', u1, v1);
             y = calculate_vector('y', u1, v1);
             z = calculate_vector('z', u1, v1);
+            normalized = normalize_vector(x, y, z);
+            x = x / normalized;
+            y = y / normalized;
+            z = z / normalized;
             glNormal3f(x, y, z);
             glVertex3f(calculate("x", u1, v1), calculate("y", u1, v1), calculate("z", u1, v1));
             x = calculate_vector('x', u2, v2);
             y = calculate_vector('y', u2, v2);
             z = calculate_vector('z', u2, v2);
+            normalized = normalize_vector(x, y, z);
+            x = x / normalized;
+            y = y / normalized;
+            z = z / normalized;
             glNormal3f(x, y, z);
             glVertex3f(calculate("x", u2, v2), calculate("y", u2, v2), calculate("z", u2, v2));
 
@@ -198,16 +272,28 @@ void egg(void)
             x = calculate_vector('x', u1, v1);
             y = calculate_vector('y', u1, v1);
             z = calculate_vector('z', u1, v1);
+            normalized = normalize_vector(x, y, z);
+            x = x / normalized;
+            y = y / normalized;
+            z = z / normalized;
             glNormal3f(x, y, z);
             glVertex3f(calculate("x", u1, v1), calculate("y", u1, v1), calculate("z", u1, v1));
             x = calculate_vector('x', u3, v3);
             y = calculate_vector('y', u3, v3);
             z = calculate_vector('z', u3, v3);
+            normalized = normalize_vector(x, y, z);
+            x = x / normalized;
+            y = y / normalized;
+            z = z / normalized;
             glNormal3f(x, y, z);
             glVertex3f(calculate("x", u3, v3), calculate("y", u3, v3), calculate("z", u3, v3));
             x = calculate_vector('x', u2, v2);
             y = calculate_vector('y', u2, v2);
             z = calculate_vector('z', u2, v2);
+            normalized = normalize_vector(x, y, z);
+            x = x / normalized;
+            y = y / normalized;
+            z = z / normalized;
             glNormal3f(x, y, z);
             glVertex3f(calculate("x", u2, v2), calculate("y", u2, v2), calculate("z", u2, v2));
         }
@@ -260,31 +346,22 @@ void Axes(void)
 
 void Mouse(int btn, int state, int x, int y)
 {
-
-
     if (btn == GLUT_LEFT_BUTTON && state == GLUT_DOWN && btn != GLUT_RIGHT_BUTTON)
     {
         x_pos_old = x;
         y_pos_old = y;
-        // przypisanie aktualnie odczytanej pozycji kursora
-        // jako pozycji poprzedniej
         status_left = 1;
-        // wcięnięty został lewy klawisz myszy
     }
     else if (btn == GLUT_RIGHT_BUTTON && state == GLUT_DOWN && btn != GLUT_LEFT_BUTTON)
     {
-        zoom_pos_old = x;
-        // przypisanie aktualnie odczytanej pozycji kursora
-        // jako pozycji poprzedniej
+        zoom_pos_old = y;
         status_right = 1;
-        // wcięnięty został prawy klawisz myszy
     }
     else
     {
         status_left = 0;
         status_right = 0;
     }
-    // nie został wcięnięty żaden klawisz
 }
 
 /*************************************************************************************/
@@ -293,19 +370,18 @@ void Mouse(int btn, int state, int x, int y)
 
 void Motion(GLsizei x, GLsizei y)
 {
-
     delta_x = x - x_pos_old;
     delta_y = y - y_pos_old;
-    delta_zoom = x - x_pos_old;
-    // obliczenie różnicy położenia kursora myszy
+    delta_zoom = y - zoom_pos_old;
 
     x_pos_old = x;
     y_pos_old = y;
-    zoom_pos_old = x;
-    // podstawienie bieżącego położenia jako poprzednie
+    zoom_pos_old = y;
 
-    glutPostRedisplay();     // przerysowanie obrazu sceny
+    glutPostRedisplay();
 }
+
+
 
 /*************************************************************************************/
 
@@ -325,17 +401,61 @@ void RenderScene(void)
     Axes();
     // Narysowanie osi przy pomocy funkcji zdefiniowanej powyżej
 
-    if (status_left == 1 && status_right == 0)                     // jeśli lewy klawisz myszy wcięnięty
+    if (mode == 1)
     {
-        theta += delta_x * pix2angle;
-        gamma += delta_y * piy2angle;
-        // modyfikacja kąta obrotu o kat proporcjonalny
-        // do różnicy położeń kursora myszy
+        if (perspective == 1) {
+            if (status_left == 1 && status_right == 0)
+            {
+                theta += delta_x * pix2angle;
+                gamma += delta_y * piy2angle;
+            }
+            if (status_right == 1 && status_left == 0)
+            {
+                viewer[2] += delta_zoom * pix2angle * 0.1; // Modyfikacja współczynnika zooma (0.1 to arbitralna wartość)
+            }
+        }
+        if (perspective == 2)
+        {
+            if (status_left == 1 && status_right == 0)
+            {
+                viewer[0] += delta_x * pix2angle * 0.1;
+                viewer[1] += delta_y * piy2angle * 0.1;
+            }
+            if (status_right == 1 && status_left == 0)
+            {
+                viewer[2] += delta_zoom * pix2angle * 0.1; // Modyfikacja współczynnika zooma (0.1 to arbitralna wartość)
+            }
+        }
     }
-    if (status_right == 1 && status_left == 0)                     // jeśli prawy klawisz myszy wcięnięty
+    if (mode == 2)
     {
-        viewer[2] += delta_zoom * pix2angle;
+        if (status_left == 1 && status_right == 0)
+        {
+            azimuth0 = delta_x * pix2angle * 0.1;
+            azimuth0 = delta_y  * piy2angle * 0.1;
+
+            light_position0[0] += calculate_angles('x', azimuth0, elevation0);
+            light_position0[1] += calculate_angles('y', azimuth0, elevation0);
+            light_position0[2] += calculate_angles('z', azimuth0, elevation0);
+
+            cout << light_position0[0] << endl;
+            cout << light_position0[1] << endl;
+            cout << light_position0[2] << endl << endl;
+        }
+        if (status_left == 0 && status_right == 1)
+        {
+            azimuth1 = delta_x * pix2angle * 0.1;
+            azimuth1 = delta_y * piy2angle * 0.1;
+
+            light_position1[0] += calculate_angles('x', azimuth1, elevation1);
+            light_position1[1] += calculate_angles('y', azimuth1, elevation1);
+            light_position1[2] += calculate_angles('z', azimuth1, elevation1);
+        }
     }
+
+    // Zmiana pozycji zrodel swiatla
+    glLightfv(GL_LIGHT0, GL_POSITION, light_position0);
+    glLightfv(GL_LIGHT1, GL_POSITION, light_position1);
 
     glColor3f(1.0f, 1.0f, 1.0f);
     // Ustawienie koloru rysowania na biały
@@ -343,17 +463,17 @@ void RenderScene(void)
     glRotatef(theta, 0.0, 1.0, 0.0);  //obrót obiektu o nowy kąt (x)
     glRotatef(gamma, 1.0, 0.0, 0.0);  //obrót obiektu o nowy kąt (y)
 
-    if(model == 1)
+    if (model == 1)
     {
         glutSolidTeapot(3.0);
-        // Narysowanie czajnika
+        // Narysowanie czajnika (solid)
     }
-    if(model == 2)
+    if (model == 2)
     {
         glTranslatef(0.0f, -4.0f, 0.0f);
         // Przesuniecie obiektu wzgledem osi Y 
-        egg();
-        // Narysowanie jajka
+        egg_2();
+        // Narysowanie jajka (siatka punktow)
     }
 
     glFlush();
@@ -366,12 +486,18 @@ void RenderScene(void)
 // Funkcja obslugujaca klawisze klawiatury
 void keys(unsigned char key, int x, int y)
 {
+    if (key == 'z') mode = 1;
+    if (key == 'x') mode = 2;
+
     if (key == 'q') model = 1;
     if (key == 'w') model = 2;
-    if (key == 'e') model = 3;
+
+    if (key == '1') perspective = 1;
+    if (key == '2') perspective = 2;
 
     RenderScene(); // przerysowanie obrazu sceny
 }
+
 
 /*************************************************************************************/
 
@@ -385,110 +511,81 @@ void MyInit(void)
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     // Kolor czyszczący (wypełnienia okna) ustawiono na czarny
 
-
     /*************************************************************************************/
-
-//  Definicja materiału z jakiego zrobiony jest czajnik
-//  i definicja źródła światła
-
-/*************************************************************************************/
-
-
-/*************************************************************************************/
-// Definicja materiału z jakiego zrobiony jest czajnik
+    // Definicja materiału z jakiego zrobiony jest czajnik i jajko
 
     GLfloat mat_ambient[] = { 1.0, 1.0, 1.0, 1.0 };
-    // współczynniki ka =[kar,kag,kab] dla światła otoczenia
-
     GLfloat mat_diffuse[] = { 1.0, 1.0, 1.0, 1.0 };
-    // współczynniki kd =[kdr,kdg,kdb] światła rozproszonego
-
-    GLfloat mat_specular[] = { 1.0, 1.0, 1.0, 1.0 };
-    // współczynniki ks =[ksr,ksg,ksb] dla światła odbitego               
-
+    GLfloat mat_specular[] = { 1.0, 1.0, 1.0, 1.0 };      
     GLfloat mat_shininess = { 20.0 };
-    // współczynnik n opisujący połysk powierzchni
 
-
-/*************************************************************************************/
-// Definicja źródła światła
-
-    // Definicja źródła światła (kolor żółty)
-
-    GLfloat light_position[] = { 0.0, 0.0, 10.0, 1.0 };
-    // położenie źródła
-
-
-    GLfloat light_ambient[] = { 0.2, 0.2, 0.0, 1.0 };
-    // składowe intensywności świecenia źródła światła otoczenia
-    // Ia = [Iar,Iag,Iab]
-
-    GLfloat light_diffuse[] = { 1.0, 1.0, 0.0, 1.0 };
-    // składowe intensywności świecenia źródła światła powodującego
-    // odbicie dyfuzyjne Id = [Idr,Idg,Idb]
-
-    GLfloat light_specular[] = { 1.0, 1.0, 0.0, 1.0 };
-    // składowe intensywności świecenia źródła światła powodującego
-    // odbicie kierunkowe Is = [Isr,Isg,Isb]
-
-    GLfloat att_constant = { 1.0 };
-    // składowa stała ds dla modelu zmian oświetlenia w funkcji
-    // odległości od źródła
-
-    GLfloat att_linear = { 0.05 };
-    // składowa liniowa dl dla modelu zmian oświetlenia w funkcji
-    // odległości od źródła
-
-    GLfloat att_quadratic = { 0.001 };
-    // składowa kwadratowa dq dla modelu zmian oświetlenia w funkcji
-    // odległości od źródła
-
-/*************************************************************************************/
-// Ustawienie parametrów materiału i źródła światła
-
-/*************************************************************************************/
-// Ustawienie patrametrów materiału
-
+    /*************************************************************************************/
+    // Ustawienie patrametrów materiału
 
     glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
     glMaterialfv(GL_FRONT, GL_AMBIENT, mat_ambient);
     glMaterialfv(GL_FRONT, GL_DIFFUSE, mat_diffuse);
     glMaterialf(GL_FRONT, GL_SHININESS, mat_shininess);
 
-
     /*************************************************************************************/
-    // Ustawienie parametrów źródła
+    // Definicja źródel światła
+  
+    // Definicja źródła światła 1 (kolor niebieski)
+    GLfloat light_ambient0[] = { 0.0, 0.0, 0.5, 1.0 };
+    GLfloat light_diffuse0[] = { 0.0, 0.0, 1.0, 1.0 };
+    GLfloat light_specular0[] = { 0.0, 0.0, 1.0, 1.0 };
+    GLfloat att_constant0 = 1.0;
+    GLfloat att_linear0 = 0.05;
+    GLfloat att_quadratic0 = 0.001;
 
-    glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
-    glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
-    glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
-    glLightfv(GL_LIGHT0, GL_POSITION, light_position);
 
-    glLightf(GL_LIGHT0, GL_CONSTANT_ATTENUATION, att_constant);
-    glLightf(GL_LIGHT0, GL_LINEAR_ATTENUATION, att_linear);
-    glLightf(GL_LIGHT0, GL_QUADRATIC_ATTENUATION, att_quadratic);
+    // Ustawienie parametrów źródła światła 1
+    glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient0);
+    glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse0);
+    glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular0);
+    glLightfv(GL_LIGHT0, GL_POSITION, light_position0);
 
+    glLightf(GL_LIGHT0, GL_CONSTANT_ATTENUATION, att_constant0);
+    glLightf(GL_LIGHT0, GL_LINEAR_ATTENUATION, att_linear0);
+    glLightf(GL_LIGHT0, GL_QUADRATIC_ATTENUATION, att_quadratic0);
+
+    // Definicja źródła światła 2 (kolor czerwony)
+    GLfloat light_ambient1[] = { 0.5, 0.0, 0.0, 1.0 };
+    GLfloat light_diffuse1[] = { 1.0, 0.0, 0.0, 1.0 };
+    GLfloat light_specular1[] = { 1.0, 0.0, 0.0, 1.0 };
+    GLfloat att_constant1 = 1.0;
+    GLfloat att_linear1 = 0.05;
+    GLfloat att_quadratic1 = 0.001;
+
+
+    // Ustawienie parametrów źródła światła 2
+    glLightfv(GL_LIGHT1, GL_AMBIENT, light_ambient1);
+    glLightfv(GL_LIGHT1, GL_DIFFUSE, light_diffuse1);
+    glLightfv(GL_LIGHT1, GL_SPECULAR, light_specular1);
+    glLightfv(GL_LIGHT1, GL_POSITION, light_position1);
+
+    glLightf(GL_LIGHT1, GL_CONSTANT_ATTENUATION, att_constant1);
+    glLightf(GL_LIGHT1, GL_LINEAR_ATTENUATION, att_linear1);
+    glLightf(GL_LIGHT1, GL_QUADRATIC_ATTENUATION, att_quadratic1);
 
     /*************************************************************************************/
     // Ustawienie opcji systemu oświetlania sceny
 
     glShadeModel(GL_SMOOTH); // właczenie łagodnego cieniowania
     glEnable(GL_LIGHTING);   // właczenie systemu oświetlenia sceny
-    glEnable(GL_LIGHT0);     // włączenie źródła o numerze 0
     glEnable(GL_DEPTH_TEST); // włączenie mechanizmu z-bufora
+    glEnable(GL_LIGHT0); // wlaczenie obslugi 1 zrodla swiatla
+    glEnable(GL_LIGHT1); // wlaczenie obslugi 2 zrodla swiatla
 
     /*************************************************************************************/
 }
 
 /*************************************************************************************/
 
-
 // Funkcja ma za zadanie utrzymanie stałych proporcji rysowanych
 // w przypadku zmiany rozmiarów okna.
 // Parametry vertical i horizontal (wysokość i szerokość okna) są 
 // przekazywane do funkcji za każdym razem gdy zmieni się rozmiar okna.
-
-
 
 void ChangeSize(GLsizei horizontal, GLsizei vertical)
 {
@@ -537,9 +634,12 @@ void main(int argc, char** argv)
 
     glutCreateWindow("Oświetlenie");
 
-    cout << "Model 1 (Czajnik): q" << endl;
-    cout << "Model 2 (Jajko): w" << endl;
-    cout << "Model 3 (...): ..." << endl;
+    cout << "Sterowanie punktem widzenia [z]" << endl;
+    cout << "Sterowanie oswietleniem [x]" << endl << endl;
+    cout << "> Obrot obiektu [1]" << endl;
+    cout << "> Zmiana polozenia obserwatora [2]" << endl;
+    cout << "> Czajnik [q]" << endl;
+    cout << "> Jajko [w]" << endl << endl;
 
     glutKeyboardFunc(keys);
     // Wlaczenie obslugi zdarzen klawiatury
